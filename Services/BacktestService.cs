@@ -6,7 +6,7 @@ namespace BotCripto.Services;
 
 public class BacktestService
 {
-    private const int WarmupCandles = 60; // candele minime richieste dalla strategia prima di poter generare segnali
+    private const int WarmupCandles = PositionTradingStrategy.MinCandles; // candele minime richieste dalla strategia prima di poter generare segnali
     private const int MinWarmupDays = 20; // storico minimo scaricato prima di startDate per il calcolo degli indicatori
     private const int LookbackCandles = 300; // candele passate alla strategia a ogni passo (come nel download standard)
 
@@ -29,17 +29,17 @@ public class BacktestService
 
     private readonly YahooDataService _dataService;
     private readonly RiskManager _riskManager;
-    private readonly EmaRibbonTrendFollowingStrategy _strategy;
+    private readonly PositionTradingStrategy _strategy;
 
     // Capitale investibile illimitato: ogni trade investe un importo fisso (capitalPerTrade), senza tetto totale
-    public BacktestService(decimal rewardRiskRatio, decimal capitalPerTrade)
+    public BacktestService(decimal rewardRiskRatio, decimal capitalPerTrade, decimal commissionPerTransaction)
     {
         _dataService = new YahooDataService();
-        _strategy = new EmaRibbonTrendFollowingStrategy();
+        _strategy = new PositionTradingStrategy();
         _riskManager = new RiskManager(
             positionValue: capitalPerTrade,
             rewardRiskRatio: rewardRiskRatio,
-            commissionsPercent: 0.25m,
+            commissionPerTransaction: commissionPerTransaction,
             taxRate: TaxRate
         );
     }
@@ -61,8 +61,8 @@ public class BacktestService
         Console.WriteLine($"📅 Periodo richiesto: {startDate:yyyy-MM-dd} → {endDate:yyyy-MM-dd}");
         Console.WriteLine($"⏱️  Timeframe: {timeframe}");
 
-        // Riscaldamento: almeno WarmupCandles + 60 candele del timeframe (1d → 120 giorni), minimo 20 giorni
-        var warmup = TimeSpan.FromTicks(Math.Max(TimeSpan.FromDays(MinWarmupDays).Ticks, TimeframeToTimeSpan(timeframe).Ticks * (WarmupCandles + 60)));
+        // Riscaldamento: almeno WarmupCandles + 60 candele del timeframe (1d → ~380 giorni di calendario), minimo 20 giorni
+        var warmup = TimeSpan.FromTicks(Math.Max(TimeSpan.FromDays(MinWarmupDays).Ticks, TimeframeToTimeSpan(timeframe).Ticks * (WarmupCandles + 60) * 7 / 5));
         var historyFrom = startDate - warmup;
 
         await _dataService.LoadAsync(historyFrom, endDate, requestedSymbols);
@@ -92,7 +92,7 @@ public class BacktestService
         var marketCandles = _dataService.GetHistoricalCandles(YahooDataService.MarketSymbol, historyFrom, endDate);
         var marketRegime = new Dictionary<DateTime, bool?>();
         for (int i = 0; i < marketCandles.Count; i++)
-            marketRegime[marketCandles[i].Time] = EmaRibbonTrendFollowingStrategy.IsMarketBullish(Window(marketCandles, i));
+            marketRegime[marketCandles[i].Time] = PositionTradingStrategy.IsMarketBullish(Window(marketCandles, i));
 
         // 1) Scarica tutte le candele prima di simulare: il portafoglio va simulato in ordine cronologico
         //    su tutti i simboli insieme, per sapere in ogni momento quanto capitale è impegnato.
@@ -270,7 +270,7 @@ public class BacktestService
         var sb = new StringBuilder();
 
         sb.AppendLine("\n" + new string('═', 80));
-        sb.AppendLine("📊 BACKTEST REPORT - BOT 11 AZIONI USA (dati storici reali Yahoo Finance)");
+        sb.AppendLine("📊 BACKTEST REPORT - BOT 12 AZIONI USA (dati storici reali Yahoo Finance)");
         sb.AppendLine(new string('═', 80));
 
         sb.AppendLine($"\n📅 PERIODO TEST:");

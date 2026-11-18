@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 // In esecuzione normale il bot scrive solo a schermo: nessun file cycles_yyyy-MM-dd.log.
 if (Environment.GetCommandLineArgs().Skip(1).FirstOrDefault()?.StartsWith("--backtest", StringComparison.OrdinalIgnoreCase) == true)
     FileLogger.Install(Path.Combine(AppContext.BaseDirectory, "Logs"), "backtest");
-Console.WriteLine($"▶️  Avvio Bot 11 - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC - eseguibile in {AppContext.BaseDirectory}");
+Console.WriteLine($"▶️  Avvio Bot 12 - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC - eseguibile in {AppContext.BaseDirectory}");
 
 // Qualsiasi errore che chiude il processo viene scritto a schermo, così si sa perché il bot si è fermato
 AppDomain.CurrentDomain.UnhandledException += (_, e) =>
@@ -17,13 +17,13 @@ TaskScheduler.UnobservedTaskException += (_, e) =>
     e.SetObserved();
 };
 AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-    Console.WriteLine($"⏹️  Bot 11 terminato - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+    Console.WriteLine($"⏹️  Bot 12 terminato - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
 Console.CancelKeyPress += (_, _) =>
     Console.WriteLine("⏹️  Chiusura richiesta con Ctrl+C");
 
 Console.WriteLine(@"
 ╔════════════════════════════════════════════════════════╗
-║       🤖 BOT 11 - ERTF - AZIONI USA (Yahoo Finance)    ║
+║       🤖 BOT 12 - POSITION TRADING - AZIONI USA (Yahoo Finance)    ║
 ║                 Backtest + Live Trading                ║
 ╚════════════════════════════════════════════════════════╝
 ");
@@ -37,6 +37,7 @@ BotDatabase.Initialize();
 var appSettings = JObject.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "appsettings.json")));
 var tradingSettings = appSettings["TradingSettings"] ?? throw new InvalidOperationException("appsettings.json: sezione TradingSettings mancante");
 var marketSettings = appSettings["MarketMonitoring"] ?? throw new InvalidOperationException("appsettings.json: sezione MarketMonitoring mancante");
+decimal CommissionPerTransaction = tradingSettings.Value<decimal?>("CommissionPerTransaction") ?? throw new InvalidOperationException("appsettings.json: CommissionPerTransaction mancante");
 decimal CapitalPerTrade = tradingSettings.Value<decimal?>("CapitalPerTrade") ?? throw new InvalidOperationException("appsettings.json: CapitalPerTrade mancante");
 decimal RewardRiskRatio =tradingSettings.Value<decimal?>("RewardRiskRatio") ?? throw new InvalidOperationException("appsettings.json: RewardRiskRatio mancante");
 string Timeframe = marketSettings.Value<string>("TimeframeForCandlesticks") ?? throw new InvalidOperationException("appsettings.json: TimeframeForCandlesticks mancante");
@@ -105,7 +106,7 @@ else
 
 async Task RunLiveAsync()
 {
-    var scheduler = new BotSchedulerService(Timeframe, RewardRiskRatio, CapitalPerTrade);
+    var scheduler = new BotSchedulerService(Timeframe, RewardRiskRatio, CapitalPerTrade, CommissionPerTransaction);
 
     Console.WriteLine("Strategia Principale Attiva:");
     Console.WriteLine("  ⭐ EMA Ribbon Trend Following + Candle Confirmation");
@@ -117,6 +118,7 @@ async Task RunLiveAsync()
     Console.WriteLine("  • Capitale investibile: illimitato");
     Console.WriteLine("  • Ricerca segnali: una volta per seduta, a mercato chiuso");
     Console.WriteLine($"  • Importo per trade: ${CapitalPerTrade:F2}");
+    Console.WriteLine($"  • Commissione: {CommissionPerTransaction:F2} per operazione (ingresso e uscita)");
     Console.WriteLine($"  • Take profit: {RewardRiskRatio}x la distanza dello stop");
     Console.WriteLine("  • Report Settimanale: Lunedì 00:00");
     Console.WriteLine("  • Tracking Metriche: Ogni 10 cicli");
@@ -139,7 +141,7 @@ async Task RunRealBacktestAsync(DateTime startDate, DateTime endDate, string tim
 {
     Console.WriteLine($"\n🔍 MODALITA' BACKTEST SU DATI STORICI REALI ATTIVATA ({startDate:yyyy-MM-dd} → {endDate:yyyy-MM-dd}, {timeframe}, capitale illimitato, ${CapitalPerTrade:F2} per trade, R:R {rewardRisk})\n");
 
-    var backtestService = new BacktestService(rewardRisk, CapitalPerTrade);
+    var backtestService = new BacktestService(rewardRisk, CapitalPerTrade, CommissionPerTransaction);
 
     try
     {

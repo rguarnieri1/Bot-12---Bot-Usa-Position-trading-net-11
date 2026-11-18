@@ -14,7 +14,7 @@ public class SyntheticBacktest
         _riskManager = new RiskManager(
             positionValue: initialCapital * 0.10m,
             rewardRiskRatio: 2.0m,
-            commissionsPercent: 0.6m,
+            commissionPerTransaction: 1.0m,
             taxRate: 0.26m
         );
         _random = new Random(42);  // Seed per reproducibilità
@@ -26,7 +26,7 @@ public class SyntheticBacktest
         decimal expectedWinRate = 0.55m,
         int tradesPerSymbol = 8)
     {
-        Console.WriteLine($"\n🔍 BACKTEST SINTETICO - BOT 11 AZIONI USA");
+        Console.WriteLine($"\n🔍 BACKTEST SINTETICO - BOT 12 AZIONI USA");
         Console.WriteLine($"⏱️  Periodo: Ultimi {daysOfData} giorni");
         Console.WriteLine($"🪙 Simboli: {numSymbols}");
         Console.WriteLine($"📊 Trade per simbolo: {tradesPerSymbol}");
@@ -125,7 +125,7 @@ public class SyntheticBacktest
                     CloseTime = closeTime,
                     EntryPrice = entryPrice,
                     ExitPrice = exitPrice,
-                    Strategy = "EMA Ribbon Trend Following (Primary)",
+                    Strategy = "Position Trading (Trend EMA50/200 + Pullback)",
                     Status = "Closed",
                     Profit = exitPrice - entryPrice,
                     ProfitPercentage = ((exitPrice - entryPrice) / entryPrice) * 100
@@ -143,7 +143,7 @@ public class SyntheticBacktest
     public void PrintBacktestReport(SyntheticBacktestResult result)
     {
         Console.WriteLine("\n" + new string('═', 90));
-        Console.WriteLine("📊 SYNTHETIC BACKTEST REPORT - BOT 11 AZIONI USA");
+        Console.WriteLine("📊 SYNTHETIC BACKTEST REPORT - BOT 12 AZIONI USA");
         Console.WriteLine(new string('═', 90));
 
         Console.WriteLine($"\n📅 PERIODO TEST:");
@@ -155,7 +155,7 @@ public class SyntheticBacktest
         Console.WriteLine($"   • Capital iniziale: ${result.InitialCapital:F2}");
         Console.WriteLine($"   • Total Trades: {result.Metrics.TotalTrades}");
         Console.WriteLine($"   • P&L Lordo: ${result.Metrics.TotalProfit:F2}");
-        Console.WriteLine($"   • Commissioni (0.1%): ${result.Metrics.TotalCommissions:F2}");
+        Console.WriteLine($"   • Commissioni (1 per operazione): ${result.Metrics.TotalCommissions:F2}");
         Console.WriteLine($"   • Net P&L: ${result.Metrics.TotalProfit - result.Metrics.TotalCommissions:F2}");
         Console.WriteLine($"   • ROI: {result.Metrics.ROI:F2}%");
 
@@ -242,7 +242,7 @@ public class SyntheticBacktest
 
             using (var writer = new StreamWriter(filePath))
             {
-                writer.WriteLine("SYNTHETIC BACKTEST REPORT - BOT 11 AZIONI USA");
+                writer.WriteLine("SYNTHETIC BACKTEST REPORT - BOT 12 AZIONI USA");
                 writer.WriteLine($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
                 writer.WriteLine("");
                 writer.WriteLine($"Period: {result.DaysOfData} days");

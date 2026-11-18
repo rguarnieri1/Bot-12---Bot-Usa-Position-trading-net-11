@@ -7,12 +7,12 @@ public class BotSchedulerService
 {
     private const int CandlesPerAnalysis = 300;  // stessa finestra del backtest
     private const int HistoryCalendarDays = 450;  // giorni di calendario che coprono 300 sedute di borsa
-    private const int MinCandlesForAnalysis = 60; // minimo richiesto dalla strategia
+    private const int MinCandlesForAnalysis = PositionTradingStrategy.MinCandles; // minimo richiesto dalla strategia
 
     private readonly YahooDataService _dataService;
     private readonly NotificationService _notificationService;
     private readonly ReportingService _reportingService;
-    private readonly EmaRibbonTrendFollowingStrategy _emaRibbonStrategy;
+    private readonly PositionTradingStrategy _positionStrategy;
     private readonly RiskManager _riskManager;
     private Timer? _marketCheckTimer;
     private Timer? _weeklyReportTimer;
@@ -32,18 +32,18 @@ public class BotSchedulerService
     private readonly Dictionary<string, int> _cumulativeRejectionCounts = new();
 
     // Capitale investibile illimitato: nessun importo totale, solo un importo fisso per trade (capitalPerTrade)
-    public BotSchedulerService(string timeframe, decimal rewardRiskRatio, decimal capitalPerTrade)
+    public BotSchedulerService(string timeframe, decimal rewardRiskRatio, decimal capitalPerTrade, decimal commissionPerTransaction)
     {
         _timeframe = timeframe;
         _timeframeSpan = BacktestService.TimeframeToTimeSpan(timeframe);
         _dataService = new YahooDataService();
         _notificationService = new NotificationService();
         _reportingService = new ReportingService();
-        _emaRibbonStrategy = new EmaRibbonTrendFollowingStrategy();
+        _positionStrategy = new PositionTradingStrategy();
         _riskManager = new RiskManager(
             positionValue: capitalPerTrade,   // importo fisso per trade ($)
             rewardRiskRatio: rewardRiskRatio, // take profit = R:R × distanza dello stop
-            commissionsPercent: 0.25m,        // 0.25% commissioni per lato
+            commissionPerTransaction: commissionPerTransaction, // commissione fissa per operazione
             taxRate: 0.26m                    // 26% tasse
         );
     }
@@ -57,7 +57,7 @@ public class BotSchedulerService
         }
 
         _isRunning = true;
-        Console.WriteLine("\n🤖 Bot 11 - Azioni USA avviato! (paper trading: nessun ordine reale)");
+        Console.WriteLine("\n🤖 Bot 12 - Azioni USA avviato! (paper trading: nessun ordine reale)");
         Console.WriteLine($"📊 Monitoraggio ogni {CheckInterval.TotalMinutes:F0} minuti, candele {_timeframe}...\n");
 
         // Esegui il primo controllo immediatamente
@@ -101,7 +101,7 @@ public class BotSchedulerService
         _isRunning = false;
         _marketCheckTimer?.Dispose();
         _weeklyReportTimer?.Dispose();
-        Console.WriteLine("\n🛑 Bot 11 - Azioni USA fermato.");
+        Console.WriteLine("\n🛑 Bot 12 - Azioni USA fermato.");
     }
 
     private async Task CheckMarketAsync()
@@ -169,9 +169,9 @@ public class BotSchedulerService
             else
             {
                 // Regime di mercato (SPY sopra/sotto la EMA50) sulla seduta appena chiusa: filtro direzionale della strategia
-                var marketBullish = EmaRibbonTrendFollowingStrategy.IsMarketBullish(marketClosed);
+                var marketBullish = PositionTradingStrategy.IsMarketBullish(marketClosed);
                 Console.WriteLine($"🕯️  Seduta del {lastClosedTime:yyyy-MM-dd} chiusa: ricerca segnali");
-                Console.WriteLine($"📊 Regime di mercato ({YahooDataService.MarketSymbol}): {(marketBullish == null ? "sconosciuto (nessun segnale)" : marketBullish.Value ? "rialzista (solo long)" : "ribassista (solo short)")}");
+                Console.WriteLine($"📊 Regime di mercato ({YahooDataService.MarketSymbol}): {(marketBullish == null ? "sconosciuto (nessun segnale)" : marketBullish.Value ? "rialzista (long consentiti)" : "ribassista (nessun long)")}");
                 cycle.BtcRegime = marketBullish == null ? "Sconosciuto" : marketBullish.Value ? "Rialzista" : "Ribassista";
 
                 _lastScannedCandle = lastClosedTime;
@@ -214,13 +214,13 @@ public class BotSchedulerService
                             continue;
                         }
 
-                        // ✅ STRATEGIA PRINCIPALE: EMA Ribbon Trend Following + Candle Confirmation
-                        var emaRibbonResult = _emaRibbonStrategy.Analyze(symbol, candles, marketBullish);
+                        // ✅ STRATEGIA: Position Trading (trend EMA50/200 + pullback), solo long
+                        var signalResult = _positionStrategy.Analyze(symbol, candles, marketBullish);
 
-                        if (emaRibbonResult.IsSignal)
-                            candidates.Add((symbol, emaRibbonResult, candles));
+                        if (signalResult.IsSignal)
+                            candidates.Add((symbol, signalResult, candles));
                         else
-                            CountRejection(RejectionLabel(emaRibbonResult.Rejection));
+                            CountRejection(RejectionLabel(signalResult.Rejection));
 
                     }
                     catch (Exception ex)
@@ -230,9 +230,9 @@ public class BotSchedulerService
                 }
 
                 // Dal segnale più forte al più debole (capitale illimitato: entrano tutti i segnali validi)
-                foreach (var (symbol, emaRibbonResult, candles) in candidates.OrderByDescending(c => c.analysis.Indicators.GetValueOrDefault("SignalStrength")))
+                foreach (var (symbol, signalResult, candles) in candidates.OrderByDescending(c => c.analysis.Indicators.GetValueOrDefault("SignalStrength")))
                 {
-                    var isLong = emaRibbonResult.Signal.Contains("BUY");
+                    var isLong = signalResult.Signal.Contains("BUY");
                     // Ingresso alla chiusura della candela del segnale (come nel backtest), non al prezzo live:
                     // lo stop della strategia è calcolato su quella candela e i controlli stop/target partono dalla successiva.
                     var entryPrice = candles.Last().Close;
@@ -241,10 +241,10 @@ public class BotSchedulerService
                         entryPrice,
                         CalculateVolatility(candles),
                         isLong,
-                        emaRibbonResult.Indicators.GetValueOrDefault("StopLoss")
+                        signalResult.Indicators.GetValueOrDefault("StopLoss")
                     );
 
-                    var signalRecord = SignalRecord.FromAnalysis(emaRibbonResult, _timeframe, lastClosedTime!.Value, entryPrice, isLong);
+                    var signalRecord = SignalRecord.FromAnalysis(signalResult, _timeframe, lastClosedTime!.Value, entryPrice, isLong);
 
                     if (!positionResult.IsValid)
                     {
@@ -256,17 +256,17 @@ public class BotSchedulerService
                         continue;
                     }
 
-                    emaRibbonResult.Indicators["StopLoss"] = positionResult.StopLossPrice;
-                    emaRibbonResult.Indicators["Target"] = positionResult.TargetPrice;
-                    emaRibbonResult.Indicators["PositionSize"] = positionResult.PositionSize;
-                    emaRibbonResult.Indicators["RiskRewardRatio"] = positionResult.RiskRewardRatio;
-                    emaRibbonResult.Indicators["ExpectedProfit"] = positionResult.ExpectedProfit;
+                    signalResult.Indicators["StopLoss"] = positionResult.StopLossPrice;
+                    signalResult.Indicators["Target"] = positionResult.TargetPrice;
+                    signalResult.Indicators["PositionSize"] = positionResult.PositionSize;
+                    signalResult.Indicators["RiskRewardRatio"] = positionResult.RiskRewardRatio;
+                    signalResult.Indicators["ExpectedProfit"] = positionResult.ExpectedProfit;
 
-                    await _notificationService.SendNotificationAsync(emaRibbonResult);
+                    await _notificationService.SendNotificationAsync(signalResult);
                     var trade = _reportingService.RecordTrade(
                         symbol,
                         entryPrice,
-                        "EMA Ribbon Trend Following (Primary)",
+                        "Position Trading (Trend EMA50/200 + Pullback)",
                         isLong,
                         positionResult.StopLossPrice,
                         positionResult.TargetPrice,
@@ -347,7 +347,7 @@ public class BotSchedulerService
         }
         finally
         {
-            // Salva il ciclo nella tabella bot11.bot11_cycles (anche se terminato con errore)
+            // Salva il ciclo nella tabella bot12.bot12_cycles (anche se terminato con errore)
             if (cycle != null)
             {
                 cycle.EndTime = DateTime.UtcNow;
