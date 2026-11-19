@@ -47,7 +47,7 @@ public class BacktestService
     // Imposta sulle plusvalenze: si applica al saldo netto del periodo (le perdite compensano i guadagni)
     private const decimal TaxRate = 0.26m;
 
-    // Esegue davvero la strategia EMA Ribbon + RiskManager candela per candela su dati storici reali
+    // Esegue davvero la strategia Position Trading (EMA50/200 + pullback) + RiskManager candela per candela su dati storici reali
     // (candele giornaliere Yahoo Finance), aprendo e chiudendo posizioni quando stop loss o target vengono toccati.
     // requestedSymbols: elenco fisso di azioni; se null si usano le più grandi per capitalizzazione
     // (attenzione: è l'elenco di oggi applicato al passato, quindi il risultato è ottimistico).

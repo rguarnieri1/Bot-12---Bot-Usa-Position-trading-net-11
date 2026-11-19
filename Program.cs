@@ -109,9 +109,9 @@ async Task RunLiveAsync()
     var scheduler = new BotSchedulerService(Timeframe, RewardRiskRatio, CapitalPerTrade, CommissionPerTransaction);
 
     Console.WriteLine("Strategia Principale Attiva:");
-    Console.WriteLine("  ⭐ EMA Ribbon Trend Following + Candle Confirmation");
-    Console.WriteLine($"     • Configurazione: EMA 5, 10, 20, 30 su candele {Timeframe}");
-    Console.WriteLine("     • Filtri: Volume, Candle Body, RSI, Breakout Confirmation, Regime di mercato (SPY vs EMA50)");
+    Console.WriteLine("  ⭐ Position Trading long-only: trend EMA50/200 + pullback su EMA20");
+    Console.WriteLine($"     • Configurazione: EMA 20, 50, 200 e RSI14 su candele {Timeframe}");
+    Console.WriteLine("     • Filtri: trend (Close > EMA50 > EMA200, EMA50 in salita), pullback EMA20/EMA50, candela rialzista con RSI 45-70 in crescita, regime di mercato (SPY vs EMA50)");
     Console.WriteLine("     • Modalità: paper trading (segnali e trade simulati, nessun ordine reale)");
     Console.WriteLine("\nImpostazioni:");
     Console.WriteLine("  • Dati: Yahoo Finance (YFSharp), azioni USA più grandi per capitalizzazione (candele giornaliere)");

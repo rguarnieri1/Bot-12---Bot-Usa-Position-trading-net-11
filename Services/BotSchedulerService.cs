@@ -418,13 +418,13 @@ public class BotSchedulerService
     private static string RejectionLabel(RejectionReason reason) => reason switch
     {
         RejectionReason.InsufficientData => "Strategia: dati insufficienti per il calcolo",
-        RejectionReason.TrendNotAligned => "Strategia: trend non allineato (EMA5/10/20/30)",
+        RejectionReason.TrendNotAligned => "Strategia: trend non rialzista (Close > EMA50 > EMA200, EMA50 in salita)",
         RejectionReason.NoVolumeData => "Strategia: volume assente",
         RejectionReason.VolumeInsufficient => "Strategia: volume insufficiente",
         RejectionReason.CandleNotStrong => "Strategia: candela non abbastanza forte",
         RejectionReason.PriceVsEma10 => "Strategia: prezzo non conferma vs EMA10",
-        RejectionReason.RsiExtreme => "Strategia: RSI estremo",
-        RejectionReason.NoBreakout => "Strategia: nessun breakout EMA confermato",
+        RejectionReason.RsiExtreme => "Strategia: ripartenza assente (candela non rialzista o RSI fuori 45-70/non in crescita)",
+        RejectionReason.NoBreakout => "Strategia: nessun pullback EMA20/EMA50 con ripresa sopra EMA20",
         RejectionReason.AgainstMarketRegime => "Strategia: contro il regime di mercato (SPY)",
         RejectionReason.MaxConcurrentTrades => "Risk Manager: troppi trade aperti simultaneamente",
         RejectionReason.ProfitBelowCommissions => "Risk Manager: profitto non copre commissioni",
